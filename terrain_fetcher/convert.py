@@ -58,16 +58,18 @@ def wgs84_to_local(
 ) -> np.ndarray:
     """Convert WGS84 positions to local ENU meters relative to a reference point.
 
+    Uses an azimuthal equidistant projection centered on the reference point
+    for horizontal (east, north), and simple subtraction for vertical (up).
+
     Returns vertices array of shape (N, 3) as (east, north, up) which maps
     to (x=east, y=north, z=up) in a Z-up coordinate frame.
     """
     transformer = pyproj.Transformer.from_crs(
-        "EPSG:4979",  # WGS84 3D
-        f"+proj=topocentric +lat_0={ref_lat} +lon_0={ref_lon} +h_0={ref_alt} +ellps=WGS84",
-        always_xy=False,
+        "EPSG:4326",
+        f"+proj=aeqd +lat_0={ref_lat} +lon_0={ref_lon} +datum=WGS84",
+        always_xy=True,
     )
-    e, n, u = transformer.transform(
-        lats.ravel(), lons.ravel(), heights.ravel()
-    )
-    vertices = np.column_stack([e, n, u]).astype(np.float32)
+    east, north = transformer.transform(lons.ravel(), lats.ravel())
+    up = heights.ravel() - ref_alt
+    vertices = np.column_stack([east, north, up]).astype(np.float32)
     return vertices
