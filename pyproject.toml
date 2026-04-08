@@ -1,0 +1,19 @@
+[project]
+name = "terrain-fetcher"
+version = "0.1.0"
+description = "Fetch textured 3D terrain data from USGS 3DEP and NAIP"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pyproj",
+    "trimesh",
+    "Pillow",
+    "requests",
+]
+
+[project.scripts]
+export-glb = "terrain_fetcher.export_glb:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
