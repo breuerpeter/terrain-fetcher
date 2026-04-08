@@ -49,10 +49,26 @@ def fetch_elevation(
     resp = requests.get(_3DEP_URL, params=params, timeout=_TIMEOUT)
     resp.raise_for_status()
 
-    if resp.headers.get("Content-Type", "").startswith("application/json"):
+    content_type = resp.headers.get("Content-Type", "")
+    if content_type.startswith("application/json"):
         raise RuntimeError(f"3DEP API error: {resp.text}")
 
-    img = Image.open(io.BytesIO(resp.content))
+    if len(resp.content) < 1024:
+        raise RuntimeError(
+            f"3DEP returned only {len(resp.content)} bytes — "
+            f"area likely outside US coverage "
+            f"(bbox: {lat_min:.4f}-{lat_max:.4f}N, {lon_min:.4f}-{lon_max:.4f}E)"
+        )
+
+    try:
+        img = Image.open(io.BytesIO(resp.content))
+        img.load()
+    except OSError as e:
+        raise RuntimeError(
+            f"Failed to decode 3DEP elevation TIFF: {e}. "
+            f"Area may be outside US coverage."
+        ) from e
+
     rows, cols = img.size[1], img.size[0]
 
     if rows > _MAX_PIXELS or cols > _MAX_PIXELS:
@@ -89,10 +105,25 @@ def fetch_imagery(
     resp = requests.get(_NAIP_URL, params=params, timeout=_TIMEOUT)
     resp.raise_for_status()
 
-    if resp.headers.get("Content-Type", "").startswith("application/json"):
+    content_type = resp.headers.get("Content-Type", "")
+    if content_type.startswith("application/json"):
         raise RuntimeError(f"NAIP API error: {resp.text}")
 
-    img = Image.open(io.BytesIO(resp.content))
+    if len(resp.content) < 1024:
+        raise RuntimeError(
+            f"NAIP returned only {len(resp.content)} bytes — "
+            f"area likely outside US coverage "
+            f"(bbox: {lat_min:.4f}-{lat_max:.4f}N, {lon_min:.4f}-{lon_max:.4f}E)"
+        )
+
+    try:
+        img = Image.open(io.BytesIO(resp.content))
+        img.load()
+    except OSError as e:
+        raise RuntimeError(
+            f"Failed to decode NAIP imagery: {e}. "
+            f"Area may be outside US coverage."
+        ) from e
     arr = np.array(img)
 
     # NAIP returns 4-band (RGB + NIR), keep only RGB
