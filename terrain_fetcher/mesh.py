@@ -36,10 +36,13 @@ def triangulate_grid(rows: int, cols: int) -> np.ndarray:
 def compute_uvs(rows: int, cols: int) -> np.ndarray:
     """Compute normalized UV coordinates for a grid of vertices.
 
-    UV (0,0) = top-left, (1,1) = bottom-right.
+    Grid rows go north→south (row 0 = north). OpenGL UV convention has
+    V=0 at the bottom of the texture (south) and V=1 at the top (north),
+    so V is inverted relative to row order.
+
     Returns array of shape (rows*cols, 2) with float32 dtype.
     """
     u = np.linspace(0.0, 1.0, cols)
-    v = np.linspace(0.0, 1.0, rows)
+    v = np.linspace(1.0, 0.0, rows)
     uu, vv = np.meshgrid(u, v)
     return np.column_stack([uu.ravel(), vv.ravel()]).astype(np.float32)
