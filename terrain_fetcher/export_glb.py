@@ -1,12 +1,14 @@
 """CLI script to export terrain as GLB."""
 
 import argparse
+import logging
 from pathlib import Path
 
 from terrain_fetcher.terrain import Terrain
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
     parser = argparse.ArgumentParser(
         description="Fetch USGS terrain data and export as textured GLB."
     )
