@@ -1,23 +1,56 @@
 """Fetch elevation and imagery data from USGS REST APIs."""
 
 import io
+import logging
 
 import numpy as np
 import requests
 from PIL import Image
 
+logger = logging.getLogger(__name__)
+
 _TIMEOUT = 60
 
-_3DEP_URL = (
+_3DEP_BASE = (
     "https://elevation.nationalmap.gov/arcgis/rest/services"
-    "/3DEPElevation/ImageServer/exportImage"
+    "/3DEPElevation/ImageServer"
 )
-_NAIP_URL = (
+_NAIP_BASE = (
     "https://imagery.nationalmap.gov/arcgis/rest/services"
-    "/USGSNAIPImagery/ImageServer/exportImage"
+    "/USGSNAIPImagery/ImageServer"
 )
 
+_3DEP_URL = _3DEP_BASE + "/exportImage"
+_NAIP_URL = _NAIP_BASE + "/exportImage"
+
 _MAX_PIXELS = 8000
+
+
+def _query_source_info(base_url: str, lat: float, lon: float) -> dict:
+    """Query the identify endpoint to get source catalog attributes."""
+    import json as _json
+
+    geom = _json.dumps({
+        "x": lon, "y": lat,
+        "spatialReference": {"wkid": 4326},
+    })
+    resp = requests.get(
+        base_url + "/identify",
+        params={
+            "geometry": geom,
+            "geometryType": "esriGeometryPoint",
+            "returnCatalogItems": "true",
+            "f": "json",
+        },
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    features = data.get("catalogItems", {}).get("features", [])
+    if features:
+        return features[0].get("attributes", {})
+    return {}
 
 
 def fetch_elevation(
@@ -79,6 +112,14 @@ def fetch_elevation(
 
     elevations = np.array(img, dtype=np.float32)
     actual_bbox = (lon_min, lat_min, lon_max, lat_max)
+
+    center_lat = (lat_min + lat_max) / 2
+    center_lon = (lon_min + lon_max) / 2
+    info = _query_source_info(_3DEP_BASE, center_lat, center_lon)
+    src = info.get("Source") or info.get("Name") or "unknown"
+    date = info.get("AcquisitionDate") or info.get("pubdate") or info.get("Cdate")
+    logger.info(f"3DEP elevation: {cols}x{rows} px, source: {src}, date: {date or 'unknown'}")
+
     return elevations, actual_bbox, (rows, cols)
 
 
@@ -129,5 +170,20 @@ def fetch_imagery(
     # NAIP returns 4-band (RGB + NIR), keep only RGB
     if arr.ndim == 3 and arr.shape[2] == 4:
         arr = arr[:, :, :3]
+
+    center_lat = (lat_min + lat_max) / 2
+    center_lon = (lon_min + lon_max) / 2
+    info = _query_source_info(_NAIP_BASE, center_lat, center_lon)
+    year = info.get("Year")
+    state = info.get("State")
+    res = info.get("resolution_value")
+    res_unit = info.get("resolution_units", "")
+    logger.info(
+        f"NAIP imagery: {arr.shape[1]}x{arr.shape[0]} px, "
+        f"year: {year or 'unknown'}, state: {state or '?'}, "
+        f"resolution: {res} {res_unit}" if res else
+        f"NAIP imagery: {arr.shape[1]}x{arr.shape[0]} px, "
+        f"year: {year or 'unknown'}, state: {state or '?'}"
+    )
 
     return arr.astype(np.uint8)
