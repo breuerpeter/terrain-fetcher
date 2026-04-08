@@ -56,13 +56,13 @@ def wgs84_to_local(
     ref_lon: float,
     ref_alt: float,
 ) -> np.ndarray:
-    """Convert WGS84 positions to local meters relative to a reference point.
+    """Convert WGS84 positions to local ENU meters relative to a reference point.
 
     Uses an azimuthal equidistant projection centered on the reference point
     for horizontal, and simple subtraction for vertical.
 
-    Returns vertices array of shape (N, 3) as (north, east, up) matching
-    PX4's NED-derived frame (x=north, y=east) with Z-up.
+    Returns vertices array of shape (N, 3) as (east, north, up) — the
+    standard right-handed ENU coordinate frame.
     """
     transformer = pyproj.Transformer.from_crs(
         "EPSG:4326",
@@ -71,5 +71,5 @@ def wgs84_to_local(
     )
     east, north = transformer.transform(lons.ravel(), lats.ravel())
     up = heights.ravel() - ref_alt
-    vertices = np.column_stack([north, east, up]).astype(np.float32)
+    vertices = np.column_stack([east, north, up]).astype(np.float32)
     return vertices
